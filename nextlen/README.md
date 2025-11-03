@@ -18,13 +18,10 @@ SaaS платформа для салонів краси з AI-агентом д
 ```
 src/
 ├── components/
-│   ├── auth/          # Компоненти автентифікації
 │   ├── dashboard/     # Компоненти дашборду
 │   ├── history/       # Історія чатів
-│   ├── integrations/  # Інтеграції (Telegram, WhatsApp, Calendar)
 │   ├── layout/        # Layout компоненти (Sidebar, Header)
 │   ├── sandbox/       # Тестова пісочниця
-│   ├── subscription/  # Підписки та pricing
 │   └── training/      # Тренування AI
 ├── pages/             # Сторінки додатку
 ├── context/           # React Context (Auth, Subscription)
