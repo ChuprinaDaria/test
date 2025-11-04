@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Camera, X } from 'lucide-react';
+import { Camera, X, QrCode, Loader2 } from 'lucide-react';
+import { clientAPI } from '../../api/client';
 
 const PhotoUploadTest = () => {
   const { t } = useTranslation();
   const [photo, setPhoto] = useState(null);
   const [response, setResponse] = useState('');
+  const [generatingQR, setGeneratingQR] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState(null);
 
   const handlePhotoUpload = (e) => {
     const file = e.target.files[0];
@@ -25,6 +28,46 @@ const PhotoUploadTest = () => {
   const handleClear = () => {
     setPhoto(null);
     setResponse('');
+    setQrCodeUrl(null);
+  };
+
+  const handleGenerateQR = async () => {
+    setGeneratingQR(true);
+    try {
+      // Перевіряємо чи є вже QR коди
+      const existingQRCodes = await clientAPI.getQRCodes();
+      const qrCodes = existingQRCodes.data || [];
+      
+      if (qrCodes.length >= 10) {
+        alert(t('sandbox.maxQRCodesReached') || 'Maximum 10 QR codes allowed per client');
+        return;
+      }
+      
+      // Створюємо новий QR код з назвою "Photo Upload Test"
+      const qrData = {
+        name: 'Photo Upload Test',
+        description: t('sandbox.qrCodeDescription') || 'QR code generated from Photo Upload Test',
+        location: 'Sandbox',
+        is_active: true,
+      };
+      
+      const response = await clientAPI.createQRCode(qrData);
+      const qrCode = response.data;
+      
+      // Отримуємо URL зображення QR коду
+      if (qrCode.qr_code_url_display) {
+        setQrCodeUrl(qrCode.qr_code_url_display);
+      } else if (qrCode.qr_code_url) {
+        setQrCodeUrl(qrCode.qr_code_url);
+      } else {
+        alert(t('sandbox.qrCodeGenerated') || 'QR code generated successfully!');
+      }
+    } catch (error) {
+      console.error('Failed to generate QR code:', error);
+      alert(t('sandbox.qrCodeError') || 'Failed to generate QR code');
+    } finally {
+      setGeneratingQR(false);
+    }
   };
 
   return (
@@ -35,18 +78,51 @@ const PhotoUploadTest = () => {
       </p>
 
       {!photo ? (
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-          <Camera className="mx-auto mb-4 text-gray-400" size={48} />
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handlePhotoUpload}
-            className="hidden"
-            id="photo-input"
-          />
-          <label htmlFor="photo-input" className="btn-primary cursor-pointer">
-            {t('sandbox.uploadPhoto')}
-          </label>
+        <div className="space-y-4">
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+            <Camera className="mx-auto mb-4 text-gray-400" size={48} />
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handlePhotoUpload}
+              className="hidden"
+              id="photo-input"
+            />
+            <label htmlFor="photo-input" className="btn-primary cursor-pointer">
+              {t('sandbox.uploadPhoto')}
+            </label>
+          </div>
+          
+          {/* Generate QR Button */}
+          <div className="border-t pt-4">
+            <button
+              onClick={handleGenerateQR}
+              disabled={generatingQR}
+              className="w-full btn-secondary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {generatingQR ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>{t('sandbox.generatingQR') || 'Generating...'}</span>
+                </>
+              ) : (
+                <>
+                  <QrCode size={16} />
+                  <span>{t('sandbox.generateQR') || 'Generate QR'}</span>
+                </>
+              )}
+            </button>
+          </div>
+          
+          {qrCodeUrl && (
+            <div className="border rounded-lg p-4 bg-gray-50">
+              <p className="text-sm font-medium mb-2">{t('sandbox.qrCodeGenerated') || 'QR Code Generated:'}</p>
+              <div className="flex items-center justify-center">
+                <img src={qrCodeUrl} alt="QR Code" className="max-w-full h-auto rounded" />
+              </div>
+              <p className="text-xs text-gray-500 mt-2 text-center break-all">{qrCodeUrl}</p>
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-4">

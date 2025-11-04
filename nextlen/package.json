@@ -6,8 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:prod": "vite build --mode production",
+    "build:ftp": "npm run build:prod && cp .htaccess dist/",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "serve": "vite preview --host --port 4173"
   },
   "dependencies": {
     "@stripe/react-stripe-js": "^5.3.0",

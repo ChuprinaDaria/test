@@ -62,14 +62,35 @@
     "totalChats": "Gesamt Chats",
     "activeUsers": "Aktive Nutzer",
     "bookings": "Buchungen",
+    "messages": "Nachrichten",
     "conversion": "Konversion",
     "fromLastMonth": "vom letzten Monat",
     "recentActivity": "Letzte Aktivität",
     "topServices": "Top Dienstleistungen",
+    "topQuestions": "Top Fragen",
     "bookingsCount": "Buchungen",
+    "requests": "Anfragen",
+    "noQuestions": "Noch keine Fragen",
+    "noActivity": "Keine letzte Aktivität",
     "newChatFrom": "Neuer Chat von",
     "bookingConfirmed": "Buchung für morgen bestätigt",
-    "trainingCompleted": "AI-Training abgeschlossen"
+    "trainingCompleted": "AI-Training abgeschlossen",
+    "uploadLogo": "Logo hochladen",
+    "logoDescription": "Laden Sie Ihr Firmenlogo hoch. Es wird bei der QR-Code-Generierung verwendet.",
+    "selectLogo": "Logo auswählen",
+    "changeLogo": "Logo ändern",
+    "uploadLogoButton": "Logo hochladen",
+    "uploading": "Wird hochgeladen...",
+    "deleting": "Wird gelöscht...",
+    "deleteLogo": "Logo löschen",
+    "cancel": "Abbrechen",
+    "logoUploadSuccess": "Logo erfolgreich hochgeladen! QR-Codes werden automatisch mit dem neuen Logo neu generiert.",
+    "logoUploadError": "Logo konnte nicht hochgeladen werden",
+    "logoDeleteError": "Logo konnte nicht gelöscht werden",
+    "logoInvalidType": "Datei muss ein Bild sein",
+    "logoTooLarge": "Dateigröße muss weniger als 5MB betragen",
+    "deleteLogoConfirm": "Sind Sie sicher, dass Sie das Logo löschen möchten?",
+    "logoQRInfo": "Ihr Logo wird bei allen QR-Code-Generierungen verwendet. Bestehende QR-Codes werden automatisch neu generiert."
   },
   "training": {
     "title": "AI Trainieren",
@@ -112,7 +133,13 @@
     "aiResponse": "AI-Antwort:",
     "testResponse": "Dies ist eine Testantwort des AI-Assistenten. In der Produktion wird dies eine echte AI-Antwort sein.",
     "imageAnalysis": "Ich sehe, dass dies ein Foto ist. In der Produktion wird die AI das Bild analysieren und relevante Informationen liefern.",
-    "helloMessage": "Hallo! Wie kann ich helfen?"
+    "helloMessage": "Hallo! Wie kann ich helfen?",
+    "generateQR": "QR-Code generieren",
+    "generatingQR": "Wird generiert...",
+    "qrCodeGenerated": "QR-Code generiert:",
+    "qrCodeError": "QR-Code konnte nicht generiert werden",
+    "qrCodeDescription": "QR-Code aus Foto-Upload-Test generiert",
+    "maxQRCodesReached": "Maximal 10 QR-Codes pro Kunde erlaubt"
   },
   "integrations": {
     "title": "Integrationen",
@@ -156,7 +183,11 @@
     "allConversations": "Alle Gespräche",
     "selectChat": "Chat auswählen, um Details anzuzeigen",
     "lastActive": "Zuletzt aktiv:",
-    "noChats": "Noch keine Gespräche"
+    "noChats": "Noch keine Gespräche",
+    "addToKnowledge": "Zum Wissen hinzufügen",
+    "adding": "Hinzufügen...",
+    "addedToKnowledge": "Foto zur Wissensbasis hinzugefügt und Indizierung gestartet!",
+    "addToKnowledgeError": "Fehler beim Hinzufügen des Fotos zur Wissensbasis"
   },
   "settings": {
     "title": "Einstellungen",
@@ -229,8 +260,11 @@
     "edit": "Block bearbeiten"
   },
   "modelStatus": {
-    "title": "Modellstatus",
-    "statusMessage": "{{status}} — Das Modell ist aktiv und reagiert",
+    "title": "Modell-Status",
+    "statusMessage": "Modell ist live und antwortet",
+    "statusInactive": "Modell antwortet nicht",
+    "checking": "Status wird überprüft...",
+    "error": "Fehler",
     "lastUpdated": "Zuletzt aktualisiert",
     "version": "Version",
     "dataSources": "Datenquellen",

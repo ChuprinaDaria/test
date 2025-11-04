@@ -1,18 +1,71 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Loader2 } from 'lucide-react';
+import { clientAPI } from '../../api/client';
 
 const PromptEditor = () => {
   const { t } = useTranslation();
-  const [prompt, setPrompt] = useState(
-    `You are a friendly AI assistant for a beauty salon. Your role is to:
-- Answer questions about services and pricing
-- Help clients book appointments
-- Provide information about available time slots
-- Be polite and professional
+  const [prompt, setPrompt] = useState('');
+  const [originalPrompt, setOriginalPrompt] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
 
-Always use a warm and welcoming tone.`
-  );
+  // Завантажити поточний промт з API
+  useEffect(() => {
+    loadPrompt();
+  }, []);
+
+  const loadPrompt = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await clientAPI.getMe();
+      const currentPrompt = response.data?.custom_system_prompt || '';
+      setPrompt(currentPrompt);
+      setOriginalPrompt(currentPrompt);
+    } catch (err) {
+      console.error('Failed to load prompt:', err);
+      setError(t('training.loadPromptError') || 'Failed to load prompt');
+      // Fallback на дефолтний промт
+      const defaultPrompt = `You are a friendly AI assistant. Your role is to:
+- Answer questions professionally
+- Help users with their inquiries
+- Be polite and helpful
+
+Always use a warm and welcoming tone.`;
+      setPrompt(defaultPrompt);
+      setOriginalPrompt(defaultPrompt);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    setSuccess(false);
+    
+    try {
+      await clientAPI.updateMe({ custom_system_prompt: prompt });
+      setOriginalPrompt(prompt);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      console.error('Failed to save prompt:', err);
+      setError(t('training.savePromptError') || 'Failed to save prompt');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleReset = () => {
+    setPrompt('');
+    setError(null);
+  };
+
+  const hasChanges = prompt !== originalPrompt;
 
   return (
     <div className="card">
@@ -25,17 +78,61 @@ Always use a warm and welcoming tone.`
         {t('training.customizePrompt')}
       </p>
 
-      <textarea
-        value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
-        className="w-full h-64 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none resize-none font-mono text-sm"
-        placeholder={t('training.promptPlaceholder')}
-      />
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="animate-spin text-primary-500" size={24} />
+          <span className="ml-2 text-gray-600">{t('training.loading') || 'Loading...'}</span>
+        </div>
+      ) : (
+        <>
+          <textarea
+            value={prompt}
+            onChange={(e) => {
+              setPrompt(e.target.value);
+              setError(null);
+              setSuccess(false);
+            }}
+            className="w-full h-64 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none resize-none font-mono text-sm"
+            placeholder={t('training.promptPlaceholder') || 'Enter your custom AI behavior prompt here...'}
+          />
 
-      <div className="mt-4 flex gap-3">
-        <button className="btn-primary">{t('training.savePrompt')}</button>
-        <button className="btn-secondary">{t('training.resetDefault')}</button>
-      </div>
+          {error && (
+            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+              {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-green-700 text-sm">
+              {t('training.promptSaved') || 'Prompt saved successfully!'}
+            </div>
+          )}
+
+          <div className="mt-4 flex gap-3">
+            <button
+              onClick={handleSave}
+              disabled={saving || !hasChanges}
+              className={`btn-primary ${!hasChanges ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="animate-spin mr-2" size={16} />
+                  {t('training.saving') || 'Saving...'}
+                </>
+              ) : (
+                t('training.savePrompt')
+              )}
+            </button>
+            <button
+              onClick={handleReset}
+              disabled={saving || !hasChanges}
+              className={`btn-secondary ${!hasChanges ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {t('training.resetDefault')}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 };

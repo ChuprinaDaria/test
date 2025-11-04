@@ -1,39 +1,62 @@
 import api from './axios';
 
-export const agentAPI = {
-  // Training
-  uploadFile: (formData) => api.post('/agent/files/', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  }),
-  getFiles: () => api.get('/agent/files/'),
-  deleteFile: (fileId) => api.delete(`/agent/files/${fileId}/`),
-
-  // Prompt
-  getPrompt: () => api.get('/agent/prompt/'),
-  updatePrompt: (prompt) => api.put('/agent/prompt/', { prompt }),
-
-  // Training
-  startTraining: () => api.post('/agent/train/'),
-  getTrainingStatus: () => api.get('/agent/train/status/'),
-
-  // Testing
-  testChat: (message, photo = null) => {
+// RAG API
+export const ragAPI = {
+  // Завантажити документ для RAG
+  uploadDocument: (file, title) => {
     const formData = new FormData();
-    formData.append('message', message);
-    if (photo) {
-      formData.append('photo', photo);
-    }
-    return api.post('/agent/test/', formData);
+    formData.append('file', file);
+    formData.append('title', title);
+    return api.post('/rag/upload/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
   },
 
-  // History
+  // Публічний чат з RAG системою
+  chat: (message) => api.post('/rag/chat/', { message }),
+
+  // Отримати список embedding моделей
+  getEmbeddingModels: () => api.get('/rag/embedding-models/'),
+
+  // Отримати список AI моделей з mg.nexelin.com
+  getAIModels: () => api.get('/rag/ai-models/'),
+
+  // Встановити embedding або AI модель для клієнта
+  setEmbeddingModel: (modelId, modelType = 'embedding') => 
+    api.post('/rag/client/embedding-model/', { model_id: modelId, model_type: modelType }),
+
+  // Переіндексувати документи клієнта
+  reindexDocuments: () => api.post('/rag/client/reindex/'),
+
+  // Text-to-Speech (TTS)
+  textToSpeech: (text, voice = 'alloy') => 
+    api.post('/restaurant/tts/', { text, voice }, {
+      responseType: 'blob', // Для отримання audio файлу
+    }),
+
+  // Speech-to-Text (STT)
+  speechToText: (audioFile) => {
+    const formData = new FormData();
+    formData.append('file', audioFile);
+    return api.post('/restaurant/stt/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+};
+
+// Legacy agentAPI для сумісності (залишаємо старі методи якщо потрібно)
+export const agentAPI = {
+  // Використовуємо нові RAG ендпоінти
+  uploadFile: (file, title) => ragAPI.uploadDocument(file, title),
+  testChat: (message) => ragAPI.chat(message),
+  
+  // Залишаємо старі методи якщо потрібно для сумісності
+  getFiles: () => api.get('/agent/files/'),
+  deleteFile: (fileId) => api.delete(`/agent/files/${fileId}/`),
+  getPrompt: () => api.get('/agent/prompt/'),
+  updatePrompt: (prompt) => api.put('/agent/prompt/', { prompt }),
+  startTraining: () => api.post('/agent/train/'),
+  getTrainingStatus: () => api.get('/agent/train/status/'),
   getChatHistory: () => api.get('/agent/history/'),
   getChatDetail: (chatId) => api.get(`/agent/history/${chatId}/`),
-
-  // Integrations
-  getIntegrations: () => api.get('/integrations/'),
-  connectTelegram: (token) => api.post('/integrations/telegram/', { token }),
-  connectWhatsApp: (phoneId, token) => api.post('/integrations/whatsapp/', { phone_id: phoneId, token }),
-  connectCalendar: (email) => api.post('/integrations/calendar/', { email }),
-  disconnectIntegration: (integrationId) => api.delete(`/integrations/${integrationId}/`),
 };

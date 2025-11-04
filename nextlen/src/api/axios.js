@@ -9,12 +9,20 @@ const api = axios.create({
   },
 });
 
-// Interceptor для додавання токена
+// Interceptor для додавання токена та API ключа
 api.interceptors.request.use((config) => {
+  // Додаємо Bearer token якщо є
   const token = localStorage.getItem('access_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  
+  // Додаємо X-API-Key якщо є (працює разом з Bearer token)
+  const apiKey = localStorage.getItem('api_key');
+  if (apiKey) {
+    config.headers['X-API-Key'] = apiKey;
+  }
+  
   return config;
 });
 

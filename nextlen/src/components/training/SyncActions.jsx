@@ -1,20 +1,45 @@
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { clientAPI } from "../../api/client";
 
 const SyncActions = () => {
   const { t } = useTranslation();
   const [syncing, setSyncing] = useState(false);
   const [retraining, setRetraining] = useState(false);
 
-  const handleSync = () => {
+  const handleSync = async () => {
     setSyncing(true);
-    setTimeout(() => setSyncing(false), 1500); // mock delay
+    try {
+      const response = await clientAPI.syncData();
+      const count = response.data?.documents_count || 0;
+      alert(
+        t("syncActions.syncSuccess") || 
+        `Indexing started for ${count} new document(s)!`
+      );
+    } catch (error) {
+      console.error("Failed to sync data:", error);
+      alert(t("syncActions.syncError") || "Failed to sync data");
+    } finally {
+      setSyncing(false);
+    }
   };
 
-  const handleRetrain = () => {
+  const handleRetrain = async () => {
     setRetraining(true);
-    setTimeout(() => setRetraining(false), 2000); // mock delay
+    try {
+      const response = await clientAPI.reindexData();
+      const count = response.data?.documents_count || 0;
+      alert(
+        t("syncActions.retrainSuccess") || 
+        `Reindexing started for ${count} document(s)!`
+      );
+    } catch (error) {
+      console.error("Failed to retrain:", error);
+      alert(t("syncActions.retrainError") || "Failed to retrain");
+    } finally {
+      setRetraining(false);
+    }
   };
 
   return (

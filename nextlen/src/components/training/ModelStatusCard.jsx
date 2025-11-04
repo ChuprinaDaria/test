@@ -1,15 +1,164 @@
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { ragAPI } from "../../api/agent";
+import { clientAPI } from "../../api/client";
 
 const ModelStatusCard = () => {
   const { t } = useTranslation();
+  const [models, setModels] = useState([]);
+  const [selectedModel, setSelectedModel] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [showModelSelect, setShowModelSelect] = useState(false);
+  const [modelStatus, setModelStatus] = useState({
+    status: "Unknown",
+    lastUpdated: "Unknown",
+    dataSources: 0,
+    knowledgeBlocks: 0,
+    error: null,
+  });
+  const [statusLoading, setStatusLoading] = useState(false);
 
-  // mock data
-  const model = {
-    status: "Active",
-    lastUpdated: "2 days ago",
-    version: "v3.2.1",
-    dataSources: 6,
-    knowledgeBlocks: 5,
+  useEffect(() => {
+    loadModels();
+    loadModelStatus();
+  }, []);
+
+  const loadModels = async () => {
+    try {
+      // Отримуємо AI моделі з mg.nexelin.com
+      const aiResponse = await ragAPI.getAIModels();
+      const aiModels = aiResponse.data?.models || [];
+      
+      // Отримуємо embedding моделі та інформацію про клієнта
+      const embeddingResponse = await ragAPI.getEmbeddingModels();
+      const embeddingModels = embeddingResponse.data?.models || [];
+      
+      // Отримуємо поточну AI модель з клієнта (якщо є)
+      const clientResponse = await clientAPI.getMe().catch(() => null);
+      const clientAiModel = clientResponse?.data?.features?.ai_model;
+      
+      // Об'єднуємо моделі
+      const allModels = [
+        ...aiModels.map(m => ({
+          id: m.id,
+          name: m.name,
+          description: m.description,
+          pl: parseFloat(m.pl) || 0,
+          pc: parseFloat(m.pc) || 0,
+          ph: parseFloat(m.ph) || 0,
+          active: m.active,
+          type: 'ai',
+          updated_at: m.updated_at
+        })),
+        ...embeddingModels.map(m => ({
+          id: m.id,
+          name: m.name || m.model_name,
+          description: m.description || `${m.provider} - ${m.dimensions} dimensions`,
+          dimensions: m.dimensions,
+          type: 'embedding',
+          is_selected: m.is_selected
+        }))
+      ];
+      
+      setModels(allModels);
+      
+      // Встановити поточну модель (перевага клієнтській AI моделі, потім embedding, потім активна AI)
+      if (clientAiModel) {
+        const selectedAIModel = allModels.find(m => m.type === 'ai' && m.id === clientAiModel.id);
+        if (selectedAIModel) {
+          setSelectedModel({
+            id: selectedAIModel.id,
+            name: selectedAIModel.name,
+            type: 'ai',
+            pl: selectedAIModel.pl,
+            pc: selectedAIModel.pc,
+            ph: selectedAIModel.ph
+          });
+          return;
+        }
+      }
+      
+      const selectedEmbedding = embeddingModels.find(m => m.is_selected);
+      if (selectedEmbedding) {
+        setSelectedModel({
+          id: selectedEmbedding.id,
+          name: selectedEmbedding.name || selectedEmbedding.model_name,
+          type: 'embedding',
+          dimensions: selectedEmbedding.dimensions
+        });
+        return;
+      }
+      
+      const activeAIModel = aiModels.find(m => m.active);
+      if (activeAIModel) {
+        setSelectedModel({
+          id: activeAIModel.id,
+          name: activeAIModel.name,
+          type: 'ai',
+          pl: parseFloat(activeAIModel.pl) || 0,
+          pc: parseFloat(activeAIModel.pc) || 0,
+          ph: parseFloat(activeAIModel.ph) || 0
+        });
+      }
+    } catch (error) {
+      console.error("Failed to load models:", error);
+      // Мок дані для розробки
+      setModels([
+        { id: 1, name: "lyme", description: "best model for global processes", pl: 1.0, pc: 1.0, ph: 2.0, active: true, type: 'ai' },
+      ]);
+      setSelectedModel({ id: 1, name: "lyme", type: 'ai', pl: 1.0, pc: 1.0, ph: 2.0 });
+    }
+  };
+
+  const handleSwitchModel = async (modelId) => {
+    setLoading(true);
+    try {
+      const modelToSwitch = models.find(m => m.id === modelId);
+      
+      if (!modelToSwitch) {
+        console.error("Model not found");
+        return;
+      }
+      
+      // Для embedding та AI моделей використовуємо той самий endpoint
+      await ragAPI.setEmbeddingModel(modelId, modelToSwitch.type);
+      
+      setSelectedModel(modelToSwitch);
+      setShowModelSelect(false);
+      // Можна додати повідомлення про успіх
+    } catch (error) {
+      console.error("Failed to switch model:", error);
+      // Можна додати повідомлення про помилку
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadModelStatus = async () => {
+    setStatusLoading(true);
+    try {
+      const response = await clientAPI.getModelStatus();
+      const data = response.data;
+      
+      setModelStatus({
+        status: data.status || "Unknown",
+        lastUpdated: data.last_updated || "Unknown",
+        dataSources: data.data_sources || 0,
+        knowledgeBlocks: data.knowledge_blocks_count || 0,
+        error: data.error || null,
+      });
+    } catch (err) {
+      console.error("Failed to load model status:", err);
+      setModelStatus({
+        status: "Error",
+        lastUpdated: "Unknown",
+        dataSources: 0,
+        knowledgeBlocks: 0,
+        error: err.message || "Failed to check model status",
+      });
+    } finally {
+      setStatusLoading(false);
+    }
   };
 
   return (
@@ -18,25 +167,118 @@ const ModelStatusCard = () => {
         {t("modelStatus.title")}
       </h3>
 
-      <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
-        <p className="text-green-700 font-medium">
-          ✓ {t("modelStatus.statusMessage", { status: model.status })}
-        </p>
-      </div>
+      {statusLoading ? (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
+          <p className="text-gray-600 font-medium">
+            {t("modelStatus.checking") || "Checking status..."}
+          </p>
+        </div>
+      ) : modelStatus.status === "Active" ? (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+          <p className="text-green-700 font-medium">
+            ✓ {modelStatus.status} — {t("modelStatus.statusMessage") || "Model is live and responding"}
+          </p>
+        </div>
+      ) : (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+          <p className="text-red-700 font-medium">
+            ✗ {modelStatus.status || "Inactive"} — {t("modelStatus.statusInactive") || "Model is not responding"}
+          </p>
+          {modelStatus.error && (
+            <p className="text-red-600 text-xs mt-1">
+              {t("modelStatus.error") || "Error"}: {modelStatus.error}
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="text-sm text-gray-700 space-y-1">
         <p>
-          <strong>{t("modelStatus.lastUpdated")}:</strong> {model.lastUpdated}
+          <strong>{t("modelStatus.lastUpdated")}:</strong> {modelStatus.lastUpdated}
         </p>
         <p>
-          <strong>{t("modelStatus.version")}:</strong> {model.version}
+          <strong>{t("modelStatus.dataSources")}:</strong> {modelStatus.dataSources}
         </p>
         <p>
-          <strong>{t("modelStatus.dataSources")}:</strong> {model.dataSources}
+          <strong>{t("modelStatus.knowledgeBlocks")}:</strong> {modelStatus.knowledgeBlocks}
         </p>
-        <p>
-          <strong>{t("modelStatus.knowledgeBlocks")}:</strong> {model.knowledgeBlocks}
-        </p>
+      </div>
+
+      {/* Switch Model */}
+      <div className="mt-4">
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-sm font-medium text-gray-700">
+            Embedding Model:
+          </label>
+          <button
+            onClick={() => setShowModelSelect(!showModelSelect)}
+            className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+          >
+            {showModelSelect ? "Cancel" : "Switch Model"}
+          </button>
+        </div>
+        
+        {!showModelSelect ? (
+          <div className="border rounded-lg p-2 bg-gray-50">
+            <p className="text-sm font-medium">
+              {selectedModel?.name || "No model selected"}
+            </p>
+            {selectedModel && selectedModel.type === 'ai' && (
+              <div className="text-xs text-gray-500 mt-1">
+                <div>Local: {selectedModel.pl} • Cloud: {selectedModel.pc} • Hybrid: {selectedModel.ph}</div>
+              </div>
+            )}
+            {selectedModel && selectedModel.type === 'embedding' && (
+              <p className="text-xs text-gray-500">
+                {selectedModel.dimensions} dimensions
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="border rounded-lg p-2 bg-white">
+            {loading ? (
+              <p className="text-sm text-gray-500">Switching...</p>
+            ) : (
+              <div className="space-y-1 max-h-60 overflow-y-auto">
+                {models.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => handleSwitchModel(m.id)}
+                    className={`w-full text-left px-2 py-1.5 rounded text-sm transition ${
+                      m.id === selectedModel?.id
+                        ? "bg-primary-100 text-primary-700 font-medium"
+                        : "hover:bg-gray-100 text-gray-700"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="font-medium">{m.name}</div>
+                        {m.description && (
+                          <div className="text-xs text-gray-500">{m.description}</div>
+                        )}
+                      </div>
+                      {m.id === selectedModel?.id && (
+                        <span className="text-xs ml-2">✓</span>
+                      )}
+                    </div>
+                    {m.type === 'ai' && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        <span className="mr-2">Local: {m.pl}</span>
+                        <span className="mr-2">Cloud: {m.pc}</span>
+                        <span>Hybrid: {m.ph}</span>
+                      </div>
+                    )}
+                    {m.type === 'embedding' && m.dimensions && (
+                      <span className="text-xs text-gray-500">
+                        {m.dimensions} dimensions
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <button className="mt-4 w-full border rounded-lg py-2 hover:bg-gray-100 transition">

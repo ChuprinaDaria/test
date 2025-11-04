@@ -1,47 +1,62 @@
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { MessageSquare } from 'lucide-react';
+import { MessageSquare, Loader2 } from 'lucide-react';
+import { clientAPI } from '../../api/client';
 
 const ChatList = ({ onSelectChat, selectedChatId }) => {
   const { t } = useTranslation();
+  const [chats, setChats] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   
-  // Mock data
-  const chats = [
-    {
-      id: 1,
-      customerName: 'Maria Kovalenko',
-      lastMessage: 'Thank you for the booking!',
-      timestamp: '2 hours ago',
-      unread: 0,
-    },
-    {
-      id: 2,
-      customerName: 'Olena Shevchenko',
-      lastMessage: 'What time slots are available?',
-      timestamp: '5 hours ago',
-      unread: 2,
-    },
-    {
-      id: 3,
-      customerName: 'Ivan Petrenko',
-      lastMessage: 'How much is a haircut?',
-      timestamp: 'Yesterday',
-      unread: 0,
-    },
-    {
-      id: 4,
-      customerName: 'Anna Bondarenko',
-      lastMessage: 'Can I reschedule my appointment?',
-      timestamp: '2 days ago',
-      unread: 0,
-    },
-  ];
+  useEffect(() => {
+    loadConversations();
+  }, []);
+  
+  const loadConversations = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await clientAPI.getConversations();
+      setChats(response.data?.conversations || []);
+    } catch (err) {
+      console.error('Failed to load conversations:', err);
+      setError(t('history.loadError') || 'Failed to load conversations');
+      // Fallback на порожній список
+      setChats([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="card h-[600px] overflow-y-auto">
-      <h3 className="text-lg font-semibold mb-4">{t('history.allConversations')}</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold">{t('history.allConversations')}</h3>
+        <button
+          onClick={loadConversations}
+          className="text-sm text-primary-600 hover:text-primary-700"
+          title={t('history.refresh') || 'Refresh'}
+        >
+          ↻
+        </button>
+      </div>
 
-      <div className="space-y-2">
-        {chats.map((chat) => (
+      {loading ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="animate-spin text-primary-500" size={24} />
+        </div>
+      ) : error ? (
+        <div className="p-4 bg-red-50 text-red-700 rounded text-sm">
+          {error}
+        </div>
+      ) : chats.length === 0 ? (
+        <div className="text-center text-gray-500 py-8">
+          <p>{t('history.noChats') || 'No conversations yet'}</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {chats.map((chat) => (
           <div
             key={chat.id}
             onClick={() => onSelectChat(chat)}
@@ -66,7 +81,8 @@ const ChatList = ({ onSelectChat, selectedChatId }) => {
             <p className="text-xs text-gray-400 mt-1">{chat.timestamp}</p>
           </div>
         ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
