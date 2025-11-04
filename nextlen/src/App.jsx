@@ -8,6 +8,8 @@ import DashboardPage from './pages/DashboardPage';
 import TrainingPage from './pages/TrainingPage';
 import SandboxPage from './pages/SandboxPage';
 import HistoryPage from './pages/HistoryPage';
+import ClientLoginPage from './pages/ClientLoginPage';
+import LoginPage from './pages/LoginPage';
 // import SettingsPage from './pages/SettingsPage';
 // import PricingPage from './pages/PricingPage';
 
@@ -16,6 +18,11 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
+          {/* Client auto-login route with tag parameter */}
+          <Route path="/l" element={<ClientLoginPage />} />
+          
+          {/* Login page */}
+          <Route path="/login" element={<LoginPage />} />
 
             <Route element={<Layout />}>
               <Route path="/dashboard" element={<DashboardPage />} />

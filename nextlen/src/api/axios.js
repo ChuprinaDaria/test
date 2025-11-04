@@ -26,19 +26,56 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Interceptor для обробки помилок
+// Interceptor для обробки помилок та refresh token
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    const originalRequest = error.config;
+    
     // Якщо це помилка мережі, додаємо мок позначку для обробки в AuthContext
     if (error.code === 'ERR_NETWORK' || error.code === 'ERR_CONNECTION_REFUSED') {
       error.mock = true;
+      return Promise.reject(error);
     }
     
-    if (error.response?.status === 401) {
+    // Якщо 401 і це не був спроб refresh token
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      
+      const refreshToken = localStorage.getItem('refresh_token');
+      
+      // Якщо є refresh token, намагаємося оновити access token
+      if (refreshToken) {
+        try {
+          const { authAPI } = await import('./auth');
+          const response = await authAPI.refreshToken(refreshToken);
+          
+          if (response.data?.access) {
+            localStorage.setItem('access_token', response.data.access);
+            if (response.data.refresh) {
+              localStorage.setItem('refresh_token', response.data.refresh);
+            }
+            
+            // Повторюємо оригінальний запит з новим токеном
+            originalRequest.headers.Authorization = `Bearer ${response.data.access}`;
+            return api(originalRequest);
+          }
+        } catch (refreshError) {
+          // Якщо refresh не вдався, очищаємо токени і перенаправляємо на login
+          console.error('Token refresh failed:', refreshError);
+        }
+      }
+      
+      // Якщо refresh token немає або він не спрацював, очищаємо токени
       localStorage.removeItem('access_token');
-      window.location.href = '/login';
+      localStorage.removeItem('refresh_token');
+      
+      // Перенаправляємо на login тільки якщо це не запит на /auth/me
+      if (!originalRequest.url?.includes('/auth/me') && !originalRequest.url?.includes('/rag/auth/')) {
+        window.location.href = '/login';
+      }
     }
+    
     return Promise.reject(error);
   }
 );
