@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('clients', '0015_change_user_to_charfield'),
+        ('clients', '0018_merge_20251104_1619'),
     ]
 
     operations = [
