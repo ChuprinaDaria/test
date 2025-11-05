@@ -1,0 +1,24 @@
+from django.urls import path
+from . import views
+from . import views_bootstrap
+
+
+urlpatterns = [
+    path('query/', views.RAGQueryView.as_view(), name='rag-query'),
+    path('upload/', views.DocumentUploadView.as_view(), name='rag-upload'),
+    path('docs/', views.APIDocsView.as_view(), name='rag-docs'),
+    path('chat/', views.PublicRAGChatView.as_view(), name='rag-chat'),
+    path('auth/token-by-client-token/', views.TokenByClientTokenView.as_view(), name='token-by-client-token'),
+    path('bootstrap/<slug:branch_slug>/<slug:specialization_slug>/<slug:client_token>/', views_bootstrap.BootstrapProvisionView.as_view(), name='bootstrap-provision'),
+    path('provision-link/', views.ProvisionLinkView.as_view(), name='provision-link'),
+    path('client/features/overview/', views.ClientFeaturesOverviewView.as_view(), name='client-features-overview'),
+    # AI Models endpoint (from mg.nexelin.com)
+    path('ai-models/', views.AIModelsListView.as_view(), name='ai-models-list'),
+    # Embedding models endpoints
+    path('embedding-models/', views.EmbeddingModelsListView.as_view(), name='embedding-models-list'),
+    path('client/embedding-model/', views.ClientEmbeddingModelSetView.as_view(), name='client-embedding-model-set'),
+    path('client/index-new/', views.ClientIndexNewDocumentsView.as_view(), name='client-index-new-documents'),
+    path('client/reindex/', views.ClientReindexDocumentsView.as_view(), name='client-reindex-documents'),
+    path('embedding-models/<int:model_id>/reindex/', views.EmbeddingModelReindexView.as_view(), name='embedding-model-reindex'),
+]
+

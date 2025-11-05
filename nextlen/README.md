@@ -109,12 +109,74 @@ npm run preview
 
 ## Deployment
 
-1. Build проєкт:
-```bash
-npm run build
+### 1. Підготовка до деплою
+
+#### Створіть `.env.production` файл:
+```env
+VITE_API_URL=https://api.nexelin.com/api
+VITE_MOCK_MODE=false
 ```
 
-2. Deploy папку `dist/` на ваш хостинг (Vercel, Netlify, тощо)
+#### Змініть `VITE_API_URL` на ваш production backend URL
+
+### 2. Build для production
+
+```bash
+npm run build:prod
+```
+
+Це створить оптимізований build в папці `dist/`
+
+### 3. Deployment варіанти
+
+#### Варіант A: Docker (рекомендовано)
+
+```bash
+# Build Docker image
+docker build -t nexelin-frontend .
+
+# Запуск контейнера
+docker run -d -p 80:80 --name nexelin-frontend nexelin-frontend
+```
+
+#### Варіант B: Nginx напряму
+
+1. Скопіюйте папку `dist/` на сервер
+2. Налаштуйте Nginx (використовуйте `nginx.conf` як приклад)
+3. Вкажіть `root` на папку `dist`
+
+#### Варіант C: Vercel / Netlify
+
+1. Підключіть репозиторій
+2. Налаштуйте змінні середовища:
+   - `VITE_API_URL` - ваш backend URL
+   - `VITE_MOCK_MODE=false`
+3. Build command: `npm run build`
+4. Output directory: `dist`
+
+### 4. Перевірка після деплою
+
+- Перевірте, що всі API запити йдуть на правильний backend
+- Перевірте, що React Router працює (перехід між сторінками)
+- Перевірте, що статичні файли (CSS, JS) завантажуються
+- Перевірте CORS налаштування на backend
+
+### 5. Environment Variables
+
+**Production:**
+- `VITE_API_URL` - URL вашого backend API (обов'язково)
+- `VITE_MOCK_MODE` - завжди `false` в production
+
+**Development:**
+- `VITE_API_URL` - місцевий backend або production URL
+- `VITE_MOCK_MODE` - `true` для розробки без backend
+
+### Примітки
+
+- В production build видаляються всі `console.log`
+- Sourcemaps вимкнені для безпеки
+- Статичні файли кешуються на 1 рік
+- React Router налаштований для SPA (всі роути → index.html)
 
 ## Розробка
 

@@ -1,0 +1,452 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}Test RAG Console{% endblock %}
+
+{% block extrahead %}
+<style>
+.rag-test-container {
+    max-width: 1200px;
+    margin: 20px auto;
+    padding: 20px;
+}
+
+.rag-form-group {
+    margin-bottom: 20px;
+}
+
+.rag-form-group label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 8px;
+    color: #333;
+}
+
+.rag-form-group select,
+.rag-form-group textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.rag-form-group textarea {
+    min-height: 120px;
+    font-family: inherit;
+    resize: vertical;
+}
+
+.rag-send-btn {
+    background: #417690;
+    color: white;
+    border: none;
+    padding: 12px 30px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: bold;
+}
+
+.rag-send-btn:hover:not(:disabled) {
+    background: #2e5266;
+}
+
+.rag-send-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+.rag-response-section {
+    margin-top: 30px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+}
+
+.rag-response-section h3 {
+    margin-top: 0;
+    color: #417690;
+}
+
+.rag-answer {
+    background: white;
+    padding: 15px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+    white-space: pre-wrap;
+    line-height: 1.6;
+}
+
+.rag-sources {
+    margin-top: 20px;
+}
+
+.rag-sources-header {
+    cursor: pointer;
+    user-select: none;
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #666;
+}
+
+.rag-sources-header:hover {
+    color: #417690;
+}
+
+.rag-sources-list {
+    background: white;
+    padding: 15px;
+    border-radius: 4px;
+}
+
+.rag-source-item {
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.rag-source-item:last-child {
+    border-bottom: none;
+}
+
+.rag-loading {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+}
+
+.rag-error {
+    background: #f8d7da;
+    color: #721c24;
+    padding: 15px;
+    border-radius: 4px;
+    margin-top: 20px;
+}
+
+.rag-hidden {
+    display: none;
+}
+
+.rag-context-info {
+    background: #e7f3ff;
+    padding: 12px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+    font-size: 14px;
+}
+
+.rag-context-info strong {
+    color: #417690;
+}
+
+.rag-spinner {
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #417690;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 20px auto;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Home</a>
+    &rsaquo; <a href="{% url 'admin:clients_client_changelist' %}">Clients</a>
+    &rsaquo; Test RAG Console
+    </div>
+{% endblock %}
+
+{% block content %}
+<div class="rag-test-container">
+    <h1>RAG Test Console</h1>
+    
+    <div class="rag-context-info">
+        <strong>Testing context:</strong>
+        {% if client %}
+            Client: {{ client.user.get_full_name }} ({{ client.company_name }})
+            {% if specialization %}
+                | Specialization: {{ specialization.name }}
+            {% endif %}
+            {% if branch %}
+                | Branch: {{ branch.name }}
+            {% endif %}
+        {% else %}
+            No context selected
+        {% endif %}
+    </div>
+
+    <form id="ragTestForm">
+        {% csrf_token %}
+        
+        <input type="hidden" id="clientId" value="{{ client.id|default:'' }}">
+        <input type="hidden" id="branchId" value="{{ branch.id|default:'' }}">
+        <input type="hidden" id="specializationId" value="{{ specialization.id|default:'' }}">
+
+        <div class="rag-form-group">
+            <label for="query">Your Question:</label>
+            <textarea id="query" name="query" placeholder="Ask a question..." required></textarea>
+        </div>
+
+        <div class="rag-form-group">
+            <label for="apiKey">API Key (for restaurant public endpoints)</label>
+            <input type="text" id="apiKey" placeholder="rag_xxx..." style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
+        </div>
+        <div class="rag-form-group">
+            <label>Restaurant Chat Demo</label>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                <input type="text" id="sessionId" placeholder="session_id (auto if empty)" style="flex:1; padding:10px; border:1px solid #ccc; border-radius:4px;">
+                <input type="text" id="tableId" placeholder="table_id (optional)" style="flex:1; padding:10px; border:1px solid #ccc; border-radius:4px;">
+                <select id="lang" style="flex:0 0 120px; padding:10px; border:1px solid #ccc; border-radius:4px;">
+                    <option value="uk">uk</option>
+                    <option value="en">en</option>
+                    <option value="de">de</option>
+                    <option value="ru">ru</option>
+                </select>
+                <label style="display:flex; align-items:center; gap:6px;">
+                    <input type="checkbox" id="speakToggle"> Speak
+                </label>
+                <select id="voiceSelect" style="flex:0 0 140px; padding:10px; border:1px solid #ccc; border-radius:4px;">
+                    <option value="alloy">alloy</option>
+                    <option value="echo">echo</option>
+                    <option value="fable">fable</option>
+                    <option value="onyx">onyx</option>
+                    <option value="nova">nova</option>
+                    <option value="shimmer">shimmer</option>
+                </select>
+            </div>
+        </div>
+        <button type="submit" class="rag-send-btn" id="sendBtn">Send Query</button>
+    </form>
+
+    <div id="loadingSection" class="rag-loading rag-hidden">
+        <div class="rag-spinner"></div>
+        <p>Processing your query...</p>
+    </div>
+
+    <div id="errorSection" class="rag-error rag-hidden"></div>
+
+    <div id="responseSection" class="rag-response-section rag-hidden">
+        <h3>Response:</h3>
+        <div id="answerText" class="rag-answer"></div>
+
+        <div class="rag-sources">
+            <div class="rag-sources-header" onclick="toggleSources()">
+                ▼ Sources (<span id="sourcesCount">0</span>)
+            </div>
+            <div id="sourcesList" class="rag-sources-list"></div>
+        </div>
+
+        <div style="margin-top: 15px; font-size: 13px; color: #666;">
+            <strong>Chunks used:</strong> <span id="chunksCount">0</span> |
+            <strong>Tokens:</strong> <span id="tokensCount">0</span>
+        </div>
+    </div>
+
+    <div class="rag-response-section" style="margin-top:20px;">
+        <h3>TTS / STT Demo</h3>
+        <div class="rag-form-group">
+            <label>Text to Speech</label>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <input type="text" id="ttsText" placeholder="Enter text..." style="flex:1; padding:10px; border:1px solid #ccc; border-radius:4px;">
+                <input type="text" id="ttsVoice" placeholder="voice (alloy)" style="flex:0 0 200px; padding:10px; border:1px solid #ccc; border-radius:4px;">
+                <button id="ttsBtn" class="rag-send-btn" type="button">Synthesize</button>
+            </div>
+            <audio id="ttsAudio" controls style="margin-top:10px; width:100%;"></audio>
+        </div>
+        <div class="rag-form-group">
+            <label>Speech to Text</label>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                <input type="file" id="sttFile" accept="audio/*" style="flex:1;">
+                <button id="sttBtn" class="rag-send-btn" type="button">Transcribe</button>
+            </div>
+            <pre id="sttText" style="margin-top:10px; background:#fff; padding:10px; border-radius:4px; border:1px solid #eee;"></pre>
+        </div>
+    </div>
+</div>
+
+<script>
+const form = document.getElementById('ragTestForm');
+const queryInput = document.getElementById('query');
+const sendBtn = document.getElementById('sendBtn');
+const loadingSection = document.getElementById('loadingSection');
+const errorSection = document.getElementById('errorSection');
+const responseSection = document.getElementById('responseSection');
+const answerText = document.getElementById('answerText');
+const sourcesList = document.getElementById('sourcesList');
+const sourcesCount = document.getElementById('sourcesCount');
+const chunksCount = document.getElementById('chunksCount');
+const tokensCount = document.getElementById('tokensCount');
+const apiKeyInput = document.getElementById('apiKey');
+const sessionIdInput = document.getElementById('sessionId');
+const tableIdInput = document.getElementById('tableId');
+const langSelect = document.getElementById('lang');
+const ttsBtn = document.getElementById('ttsBtn');
+const speakToggle = document.getElementById('speakToggle');
+const voiceSelect = document.getElementById('voiceSelect');
+const ttsText = document.getElementById('ttsText');
+const ttsVoice = document.getElementById('ttsVoice');
+const ttsAudio = document.getElementById('ttsAudio');
+const sttBtn = document.getElementById('sttBtn');
+const sttFile = document.getElementById('sttFile');
+const sttText = document.getElementById('sttText');
+
+function toggleSources() {
+    sourcesList.classList.toggle('rag-hidden');
+}
+
+function showError(message) {
+    errorSection.textContent = message;
+    errorSection.classList.remove('rag-hidden');
+    loadingSection.classList.add('rag-hidden');
+}
+
+function hideError() {
+    errorSection.classList.add('rag-hidden');
+}
+
+form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const query = queryInput.value.trim();
+    if (!query) return;
+
+    hideError();
+    responseSection.classList.add('rag-hidden');
+    loadingSection.classList.remove('rag-hidden');
+    sendBtn.disabled = true;
+
+    const clientId = document.getElementById('clientId').value;
+    const branchId = document.getElementById('branchId').value;
+    const specializationId = document.getElementById('specializationId').value;
+
+    try {
+        const headers = { 'Content-Type': 'application/json' };
+        const csrfInput = document.querySelector('input[name=csrfmiddlewaretoken]');
+        if (csrfInput && csrfInput.value) headers['X-CSRFToken'] = csrfInput.value;
+
+        const payload = {
+            query,
+            client_id: clientId ? parseInt(clientId, 10) : null,
+            branch_id: branchId ? parseInt(branchId, 10) : null,
+            specialization_id: specializationId ? parseInt(specializationId, 10) : null,
+        };
+
+        const response = await fetch('/api/clients/rag-test/', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+
+        if (!response.ok) throw new Error(data.error || 'Request failed');
+
+        answerText.textContent = data.answer || '';
+        sourcesList.innerHTML = '';
+        const sources = Array.isArray(data.sources) ? data.sources : [];
+        sourcesCount.textContent = String(sources.length);
+        sources.forEach((s) => {
+            const div = document.createElement('div');
+            div.className = 'rag-source-item';
+            const title = s.title || s.document_title || 'Source';
+            const level = s.level || '';
+            const sim = (typeof s.similarity === 'number') ? s.similarity.toFixed(3) : '';
+            div.textContent = `${title}${level ? ' [' + level + ']' : ''}${sim ? ' — ' + sim : ''}`;
+            sourcesList.appendChild(div);
+        });
+        chunksCount.textContent = String(data.num_chunks || 0);
+        tokensCount.textContent = String(data.total_tokens || 0);
+        responseSection.classList.remove('rag-hidden');
+        loadingSection.classList.add('rag-hidden');
+    } catch (error) {
+        showError(`Error: ${error.message}`);
+    } finally {
+        sendBtn.disabled = false;
+    }
+});
+
+queryInput.addEventListener('input', () => {
+    sendBtn.disabled = !queryInput.value.trim();
+});
+
+ttsBtn.addEventListener('click', async () => {
+    const apiKey = apiKeyInput.value.trim();
+    const text = ttsText.value.trim();
+    const voice = ttsVoice.value.trim() || 'alloy';
+    if (!apiKey || !text) {
+        alert('Enter API key and text');
+        return;
+    }
+    try {
+        const resp = await fetch('/api/restaurant/tts/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-API-Key': apiKey
+            },
+            body: JSON.stringify({ text, voice })
+        });
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.error || 'TTS failed');
+        }
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        ttsAudio.src = url;
+        ttsAudio.play();
+    } catch (e) {
+        alert(e.message);
+    }
+});
+
+sttBtn.addEventListener('click', async () => {
+    const apiKey = apiKeyInput.value.trim();
+    const file = sttFile.files[0];
+    if (!apiKey || !file) {
+        alert('Select audio file and enter API key');
+        return;
+    }
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+        const resp = await fetch('/api/restaurant/stt/', {
+            method: 'POST',
+            headers: { 'X-API-Key': apiKey },
+            body: formData
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'STT failed');
+        sttText.textContent = data.text || '';
+    } catch (e) {
+        alert(e.message);
+    }
+});
+
+function b64toBlob(b64Data, contentType='application/octet-stream', sliceSize=512) {
+    const byteCharacters = atob(b64Data);
+    const byteArrays = [];
+    for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+        const slice = byteCharacters.slice(offset, offset + sliceSize);
+        const byteNumbers = new Array(slice.length);
+        for (let i = 0; i < slice.length; i++) {
+            byteNumbers[i] = slice.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        byteArrays.push(byteArray);
+    }
+    return new Blob(byteArrays, {type: contentType});
+}
+</script>
+{% endblock %}
+
+
+
+

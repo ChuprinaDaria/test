@@ -116,12 +116,59 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  const loginByClientToken = async (clientToken) => {
+    try {
+      // Отримуємо JWT токен через client_token
+      const { data } = await authAPI.getTokenByClientToken(clientToken);
+      
+      if (data && data.access) {
+        // Зберігаємо токени
+        localStorage.setItem('access_token', data.access);
+        if (data.refresh) {
+          localStorage.setItem('refresh_token', data.refresh);
+        }
+        
+        // Отримуємо профіль користувача
+        try {
+          const profileResponse = await authAPI.getProfile();
+          setUser(profileResponse.data);
+        } catch (profileError) {
+          // Якщо не вдалося отримати профіль, використовуємо дані з токену
+          if (data.client) {
+            setUser({
+              id: data.client.id,
+              email: data.client.user || '',
+              company_name: data.client.company_name || '',
+              client_type: data.client.client_type || 'generic',
+            });
+          }
+        }
+        
+        return data;
+      }
+      throw new Error('Invalid response from server');
+    } catch (error) {
+      // Мок режим: якщо backend недоступний
+      if (MOCK_MODE || error.code === 'ERR_NETWORK' || error.code === 'ERR_CONNECTION_REFUSED') {
+        const mockUser = createMockUser();
+        const mockToken = 'mock_token_' + Date.now();
+        localStorage.setItem('access_token', mockToken);
+        localStorage.setItem('refresh_token', mockToken);
+        localStorage.setItem('mock_user', JSON.stringify(mockUser));
+        setUser(mockUser);
+        return { access: mockToken, refresh: mockToken, user: mockUser };
+      }
+      throw error;
+    }
+  };
+
   const value = {
     user,
     loading,
     login,
     register,
     logout,
+    loginByClientToken,
     isAuthenticated: !!user,
   };
 

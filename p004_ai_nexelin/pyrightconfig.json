@@ -1,0 +1,29 @@
+{
+  "venvPath": "/home/dchuprina/p004_ai_nexelin",
+  "venv": "venv",
+  "pythonVersion": "3.12",
+  "include": [
+    "MASTER"
+  ],
+  "stubPaths": ["typings"],
+  "pythonPlatform": "Linux",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": false,
+  "reportMissingTypeStubs": "warning",
+  "reportGeneralTypeIssues": "warning",
+  "reportOptionalMemberAccess": "warning",
+  "reportOptionalSubscript": "warning",
+  "executionEnvironments": [
+    {
+      "root": ".",
+      "venv": "venv",
+      "pythonPath": "/home/dchuprina/p004_ai_nexelin/venv/bin/python"
+    }
+  ],
+  "extraPaths": [
+    "/home/dchuprina/p004_ai_nexelin/venv/lib/python3.12/site-packages",
+    "/home/dchuprina/p004_ai_nexelin/venv/lib/python3.12/site-packages/django-stubs",
+    "/home/dchuprina/p004_ai_nexelin/venv/lib/python3.12/site-packages/django-stubs/django-stubs"
+  ]
+}
+

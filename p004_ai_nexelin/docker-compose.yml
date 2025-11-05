@@ -1,0 +1,162 @@
+
+
+services:
+  # ======================== DATABASE =========================
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: ai_nexelin_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-admin_db}
+      POSTGRES_USER: ${DB_USER:-admin_user}
+      POSTGRES_PASSWORD: ${DB_PASS:-admin_pass}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init__db.sql:/docker-entrypoint-initdb.d/01-init-vector.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-admin_user} -d ${DB_NAME:-admin_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [nexelin_network]
+
+  # ========================= REDIS ===========================
+  redis:
+    image: redis:7-alpine
+    container_name: ai_nexelin_redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [nexelin_network]
+
+  # ========================= BACKEND =========================
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai_nexelin_web
+    restart: unless-stopped
+    command: >
+      sh -c "gunicorn MASTER.wsgi:application --bind 0.0.0.0:8000 --workers 3 --threads 2 --timeout 120"
+    ports:
+      - "8000:8000"
+    environment:
+      DJANGO_SETTINGS_MODULE: MASTER.settings
+      DEBUG: "1"
+      SECRET_KEY: ${SECRET_KEY:-dev-secret}
+      DB_NAME: ${DB_NAME:-admin_db}
+      DB_USER: ${DB_USER:-admin_user}
+      DB_PASS: ${DB_PASS:-admin_pass}
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      CLIENT_PORTAL_BASE_URL: "https://app.nexelin.com"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [nexelin_network]
+
+  # ==================== CELERY WORKER ========================
+  celery_worker:
+    build:
+      context: .
+    container_name: ai_nexelin_celery_worker
+    restart: unless-stopped
+    command: sh -c "celery -A MASTER worker -l info"
+    environment:
+      DJANGO_SETTINGS_MODULE: MASTER.settings
+      DEBUG: "0"
+      SECRET_KEY: ${SECRET_KEY:-dev-secret}
+      DB_NAME: ${DB_NAME:-admin_db}
+      DB_USER: ${DB_USER:-admin_user}
+      DB_PASS: ${DB_PASS:-admin_pass}
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+      - .:/app
+    networks: [nexelin_network]
+
+  # ==================== CELERY BEAT ==========================
+  celery_beat:
+    build:
+      context: .
+    container_name: ai_nexelin_celery_beat
+    restart: unless-stopped
+    command: sh -c "celery -A MASTER beat -l info"
+    environment:
+      DJANGO_SETTINGS_MODULE: MASTER.settings
+      DEBUG: "0"
+      SECRET_KEY: ${SECRET_KEY:-dev-secret}
+      DB_NAME: ${DB_NAME:-admin_db}
+      DB_USER: ${DB_USER:-admin_user}
+      DB_PASS: ${DB_PASS:-admin_pass}
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+      - .:/app
+    networks: [nexelin_network]
+
+  # ========================= FRONTEND =========================
+  client:
+    build:
+      context: ./MASTER/client_portal
+      dockerfile: Dockerfile.frontend
+      args:
+        VITE_API_BASE_URL: "https://api.nexelin.com"
+    image: nexelin-client:latest
+    container_name: nexelin_client
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    networks: [nexelin_network]
+
+# ===================== NETWORKS & VOLUMES ====================
+networks:
+  nexelin_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:
