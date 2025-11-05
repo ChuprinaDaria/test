@@ -134,25 +134,40 @@ class APIDocsView(APIView):
 
 class PublicRAGChatView(APIView):
     """Public RAG chat endpoint - доступний для всіх клієнтів.
-    
-    Headers: X-API-Key (валідний API ключ будь-якого клієнта)
+
+    Підтримує 2 типи авторизації:
+    - JWT Bearer token (для клієнтського фронтенду)
+    - X-API-Key header (для зовнішніх API)
+
     Body JSON: { "message": "..." }
     Response: { "response": "...", "sources": [...], "num_chunks": N, "total_tokens": N }
     """
+    permission_classes = [AllowAny]
+
     def post(self, request):
-        # Валідація API ключа (для rate limiting та безпеки), але не прив'язка до конкретного клієнта
-        api_key = request.headers.get('X-API-Key')
-        if not api_key:
-            return Response({'error': 'API key required'}, status=status.HTTP_401_UNAUTHORIZED)
-        
-        try:
-            key_obj = ClientAPIKey.objects.get(key=api_key, is_active=True)
-            if not key_obj.is_valid():
+        # Перевіряємо чи є JWT авторизація
+        client = None
+        if request.user and request.user.is_authenticated:
+            # Якщо користувач авторизований через JWT, отримуємо його клієнта
+            try:
+                from MASTER.clients.views import get_client_from_request
+                client = get_client_from_request(request)
+            except Exception:
+                pass
+
+        # Якщо немає JWT, перевіряємо X-API-Key
+        if not client:
+            api_key = request.headers.get('X-API-Key')
+            if not api_key:
+                return Response({'error': 'Authentication required (JWT or API key)'}, status=status.HTTP_401_UNAUTHORIZED)
+
+            try:
+                key_obj = ClientAPIKey.objects.get(key=api_key, is_active=True)
+                if not key_obj.is_valid():
+                    return Response({'error': 'Invalid API key'}, status=status.HTTP_401_UNAUTHORIZED)
+                client = key_obj.client
+            except ClientAPIKey.DoesNotExist:
                 return Response({'error': 'Invalid API key'}, status=status.HTTP_401_UNAUTHORIZED)
-            # Отримуємо клієнта для контексту, але не обмежуємо доступ
-            client = key_obj.client
-        except ClientAPIKey.DoesNotExist:
-            return Response({'error': 'Invalid API key'}, status=status.HTTP_401_UNAUTHORIZED)
 
         message = request.data.get('message', '')
         if not message:
