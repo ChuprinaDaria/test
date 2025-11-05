@@ -228,19 +228,26 @@ class TokenByClientTokenView(APIView):
         if not client:
             return Response({'error': 'Client not found'}, status=status.HTTP_401_UNAUTHORIZED)
 
-        # Створюємо фейковий user object для JWT
+        # Отримуємо існуючий user object для JWT (використовуємо того ж користувача, що був створений при bootstrap)
         from MASTER.accounts.models import User as AppUser
-        fake_user, _ = AppUser.objects.get_or_create(
-            username=f"client_{client.id}",
+
+        # Client.user - це CharField з username, тому шукаємо User об'єкт за username
+        client_username = getattr(client, 'user', None)
+        if not client_username:
+            # Fallback: якщо немає username, створюємо generic user
+            client_username = f"client_{client.id}"
+
+        user_obj, created = AppUser.objects.get_or_create(
+            username=client_username,
             defaults={
-                'email': f"client_{client.id}@system.local",
-                'first_name': getattr(client, 'user', 'Client'),
+                'email': f"{client_username[:40]}@system.local",
+                'first_name': getattr(client, 'company_name', 'Client')[:30] or 'Client',
                 'last_name': '',
                 'role': 'client'
             }
         )
-        
-        refresh = RefreshToken.for_user(fake_user)
+
+        refresh = RefreshToken.for_user(user_obj)
         return Response({
             'access': str(refresh.access_token),  # type: ignore
             'refresh': str(refresh),
@@ -291,10 +298,14 @@ class BootstrapProvisionView(APIView):
         )
 
         # 3) Client user (role=client), identified by client_token
-        # FIRST: Check if API key with this token already exists
-        client_api = ClientAPIKey.objects.select_related('client').filter(key=client_token).first()
-        client = getattr(client_api, 'client', None)
-        
+        # FIRST: Check if client with this tag already exists (prevents duplicates)
+        client = Client.objects.filter(tag=client_token).first()
+
+        if client is None:
+            # SECOND: Check if API key with this token already exists
+            client_api = ClientAPIKey.objects.select_related('client').filter(key=client_token).first()
+            client = getattr(client_api, 'client', None)
+
         if client is None:
             # Build a safe, deterministic base username within DB limits
             max_username_len = getattr(User._meta.get_field('username'), 'max_length', 150)  # type: ignore
@@ -306,9 +317,9 @@ class BootstrapProvisionView(APIView):
             safe_base = (token_slug[:max_base_len] if max_base_len > 0 else '')
             username = f"{base_prefix}{safe_base}_{token_hash}"
 
-            # Prefer existing client by username if still none
+            # THIRD: Prefer existing client by username if still none
             client = Client.objects.filter(user=username).first()
-            
+
             if client is None:
                 # Create user with minimal required fields (without relying on manager-specific methods)
                 email = f"{username[:40]}@example.local"
