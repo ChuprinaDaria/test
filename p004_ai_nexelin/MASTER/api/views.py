@@ -173,10 +173,24 @@ class PublicRAGChatView(APIView):
         if not message:
             return Response({'error': 'message is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Використовуємо клієнта для пошуку ТІЛЬКИ в його даних (приватні дані)
+        # Використовуємо клієнта для пошуку в його даних + даних бранча та спеціалізації
         generator = ResponseGenerator()
-        # Передаємо client для пошуку ТІЛЬКИ в даних цього клієнта (ізольований пошук)
-        rag_response = generator.generate(query=message, client=client, stream=False)
+
+        # Отримуємо branch та specialization клієнта для багаторівневого пошуку
+        specialization = getattr(client, 'specialization', None)
+        branch = getattr(specialization, 'branch', None) if specialization else None
+
+        # Передаємо client, specialization та branch для багаторівневого пошуку:
+        # - Client embeddings (приватні дані клієнта)
+        # - Specialization embeddings (спільні дані для всіх клієнтів цієї спеціалізації)
+        # - Branch embeddings (спільні дані для всіх клієнтів цього бранча)
+        rag_response = generator.generate(
+            query=message,
+            client=client,
+            specialization=specialization,
+            branch=branch,
+            stream=False
+        )
         return Response({
             'response': getattr(rag_response, 'answer', ''),
             'sources': getattr(rag_response, 'sources', []),
